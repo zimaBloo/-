@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Language Detection Tool</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f4f4f9;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            min-width: 300px;
+            width: auto;
+            max-width: 80%;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px 0;
+            width: 100%;
+            display: block;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #5c67f2;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4a54e1;
+        }
+        #result {
+            width: 100%;
+            margin-top: 20px;
+            text-align: center;
+            word-wrap: break-word;
+        }
+        .highlight {
+            background-color: yellow;
+        }
+    </style>
+</head>
+<body>
+    <form id="langForm">
+        <input type="text" id="textInput" placeholder="Введите текст..." required>
+        <button type="button" onclick="submitText()">Определить язык</button>
+        <div id="result">
+            <div id="detectionResult"></div>
+            <div id="highlightedText"></div>
+        </div>
+    </form>
+    <script>
+        let listenerActivated = false;
+    
+        function submitText() {
+            const text = document.getElementById('textInput').value;
+
+            fetch('/detect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: text, saveToDB: true })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultElement = document.getElementById('detectionResult');
+                resultElement.innerHTML = '';
+
+                const resultContainer = document.createElement('div');
+                let isFirstProperty = true;
+
+                for (const key in data.result) {
+                    if (data.result.hasOwnProperty(key)) {
+                        if (isFirstProperty) {
+                            isFirstProperty = false;
+                            continue;
+                        }
+
+                        const propertyElement = document.createElement('p');
+                        propertyElement.textContent = `${key}: ${data.result[key]}`;
+                        
+                        resultContainer.appendChild(propertyElement);
+                    }
+                }
+
+                resultElement.appendChild(resultContainer);
+                highlightText(data.result);
+
+                if (!listenerActivated) {
+                    addInputEventListener();
+                    listenerActivated = true;  
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    
+        function addInputEventListener() {
+            document.getElementById('textInput').addEventListener('input', function() {
+                clearTimeout(this.delay);
+                this.delay = setTimeout(() => {
+                    const text = this.value;
+                    fetch('/detect', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ text: text })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        highlightText(data.result);
+                    })
+                    .catch(error => console.error('Error:', error));
+                }, 200);
+            });
+        }
+    
+        function highlightText(result) {
+            
+            const oppositeLanguagePattern = result.language === 'Русский' ? /[A-Za-z]/g : /[\u0400-\u04FF]/g;
+
+            let highlightedText = result.text.replace(oppositeLanguagePattern, match => `<span class="highlight">${match}</span>`);
+
+            document.getElementById('highlightedText').innerHTML =
+                `<span>Неподходящие символы:</span><br>${highlightedText}`;
+        }
+        
+    </script>
+    
+</body>
+</html>
+
